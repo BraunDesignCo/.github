@@ -2,7 +2,7 @@
 
 Boutique Shopify Plus agency in Austin, Texas. We build custom storefronts for ecommerce brands and help them migrate, perform, and stay discoverable as search moves toward AI.
 
-Founded in 2016, we work as a single point of contact for a small roster of mid-market brands, writing code that fits your theme architecture instead of fighting it.
+Founded in 2016, we work with mid-market brands, writing code that fits your theme architecture instead of fighting it.
 
 ## What we do
 
