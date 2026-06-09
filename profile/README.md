@@ -1,4 +1,4 @@
-# Braun Design Co
+# Custom Shopify development for ecommerce brands
 
 Boutique Shopify Plus agency in Austin, Texas. We build custom storefronts for ecommerce brands and help them migrate, perform, and stay discoverable as search moves toward AI.
 
@@ -22,4 +22,6 @@ KT Tape, Baby Trend, EcoNugenics, Saalt, Urban Body Jewelry, Derma E, and Gossam
 ## Work with us
 
 - Site: [braundesign.co](https://braundesign.co)
-- Book a call: [braundesign.co/meet30](https://braundesign.co/meet30)  
+- Shopify Partner Directory: [shopify.com/partners/directory/partner/braun-design-co](https://www.shopify.com/partners/directory/partner/braun-design-co)
+- ShopExperts: [shopexperts.com/agencies/braun-design-co](https://shopexperts.com/agencies/braun-design-co)
+- Book a call: [braundesign.co/meet30](https://braundesign.co/meet30)
