@@ -17,9 +17,9 @@ We work close to the platform: Liquid, GraphQL, custom web pixels, and Shopify F
 
 ## Brands we've worked with
 
-KT Tape, Baby Trend, Saalt, Urban Body Jewelry, Derma E, and Gossamer Gear.
+KT Tape, Baby Trend, EcoNugenics, Saalt, Urban Body Jewelry, Derma E, and Gossamer Gear.
 
 ## Work with us
 
 - Site: [braundesign.co](https://braundesign.co)
-- Book a call: [braundesign.co/meet30](https://braundesign.co/meet30)
+- Book a call: [braundesign.co/meet30](https://braundesign.co/meet30)  
