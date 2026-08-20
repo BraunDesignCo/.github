@@ -1,0 +1,145 @@
+# Reusable Grok second-opinion PR review (xAI API).
+#
+# Call from any BDC repo with a stub like:
+#
+#   name: Grok second-opinion review
+#   on:
+#     pull_request:
+#       types: [opened, synchronize, reopened, ready_for_review]
+#   permissions:
+#     contents: read
+#     pull-requests: write
+#   jobs:
+#     grok:
+#       uses: BraunDesignCo/.github/.github/workflows/grok-review.yml@main
+#       secrets: inherit
+#       with:
+#         context: |
+#           <repo-specific review guidance, optional>
+#
+# Each caller repo needs its own XAI_API_KEY Actions secret (org-level
+# secrets do not reach private repos on the free plan). Without the secret
+# the job exits quietly and never fails the PR. Opt a PR out with the
+# `skip-grok` label.
+
+name: Grok second-opinion review (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      context:
+        description: Repo-specific review guidance appended to the system prompt
+        type: string
+        required: false
+        default: ""
+      model:
+        description: xAI model to use
+        type: string
+        required: false
+        default: grok-4
+      max_diff_bytes:
+        description: Diff size cap sent to the model
+        type: number
+        required: false
+        default: 180000
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: grok-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: ${{ !github.event.pull_request.draft && !contains(github.event.pull_request.labels.*.name, 'skip-grok') }}
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+      GROK_MODEL: ${{ inputs.model }}
+      MAX_DIFF: ${{ inputs.max_diff_bytes }}
+      REPO_CONTEXT: ${{ inputs.context }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
+      REPO: ${{ github.repository }}
+      COMMENT_MARKER: "<!-- grok-second-opinion -->"
+    steps:
+      - name: Bail quietly if no API key
+        id: keycheck
+        run: |
+          if [ -z "$XAI_API_KEY" ]; then
+            echo "XAI_API_KEY secret not set; skipping Grok review." >> "$GITHUB_STEP_SUMMARY"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Collect diff and PR body
+        if: steps.keycheck.outputs.skip != 'true'
+        run: |
+          gh pr diff "$PR_NUMBER" --repo "$REPO" > /tmp/diff.patch
+          gh pr view "$PR_NUMBER" --repo "$REPO" --json body --jq '.body // ""' > /tmp/body.md
+          head -c "$MAX_DIFF" /tmp/diff.patch > /tmp/diff-capped.patch
+          if [ "$(wc -c < /tmp/diff.patch)" -gt "$MAX_DIFF" ]; then
+            printf '\n\n[DIFF TRUNCATED — review what is shown and say the review is partial]\n' >> /tmp/diff-capped.patch
+          fi
+
+      - name: Ask Grok
+        if: steps.keycheck.outputs.skip != 'true'
+        run: |
+          cat > /tmp/system.txt <<'PROMPT'
+          You are giving an independent second-opinion code review on a pull
+          request. Rules:
+          - Report only actionable findings. No praise, no diff summaries.
+          - Every claim needs file:line (or file + hunk) evidence from the diff.
+          - Check the PR description's claims against what the diff actually
+            does; flag any mismatch.
+          - End with exactly one line: "VERDICT: merge" or "VERDICT: needs-changes".
+          - If the diff is docs-only, say so in one line and keep it short.
+          PROMPT
+          if [ -n "$REPO_CONTEXT" ]; then
+            printf '\nRepo-specific guidance:\n%s\n' "$REPO_CONTEXT" >> /tmp/system.txt
+          fi
+          jq -n \
+            --rawfile sys /tmp/system.txt \
+            --rawfile diff /tmp/diff-capped.patch \
+            --rawfile body /tmp/body.md \
+            --arg title "$PR_TITLE" \
+            --arg model "$GROK_MODEL" \
+            '{model: $model, temperature: 0.2, max_tokens: 2500,
+              messages: [
+                {role: "system", content: $sys},
+                {role: "user", content: ("PR title: " + $title + "\n\nPR description:\n" + $body + "\n\nDiff:\n" + $diff)}
+              ]}' > /tmp/req.json
+          HTTP_CODE=$(curl -sS -o /tmp/resp.json -w '%{http_code}' \
+            https://api.x.ai/v1/chat/completions \
+            -H "Authorization: Bearer $XAI_API_KEY" \
+            -H "Content-Type: application/json" \
+            --data @/tmp/req.json)
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "xAI API returned $HTTP_CODE" >> "$GITHUB_STEP_SUMMARY"
+            cat /tmp/resp.json >> "$GITHUB_STEP_SUMMARY" || true
+            echo "Grok review unavailable (API $HTTP_CODE)." > /tmp/review.md
+          else
+            jq -r '.choices[0].message.content // "Grok returned an empty response."' /tmp/resp.json > /tmp/review.md
+          fi
+
+      - name: Post or update PR comment
+        if: steps.keycheck.outputs.skip != 'true'
+        run: |
+          {
+            echo "$COMMENT_MARKER"
+            echo "## Grok second opinion (\`$GROK_MODEL\`)"
+            echo
+            cat /tmp/review.md
+            echo
+            echo "---"
+            echo "_Independent review — verify findings against the code before acting. Label \`skip-grok\` to opt a PR out._"
+          } > /tmp/comment.md
+          EXISTING=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+            --jq ".[] | select(.body | startswith(\"$COMMENT_MARKER\")) | .id" | head -n 1)
+          if [ -n "$EXISTING" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$EXISTING" -F body=@/tmp/comment.md > /dev/null
+          else
+            gh api "repos/$REPO/issues/$PR_NUMBER/comments" -F body=@/tmp/comment.md > /dev/null
+          fi
