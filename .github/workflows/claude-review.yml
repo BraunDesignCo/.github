@@ -1,8 +1,8 @@
-# Reusable Grok second-opinion PR review (xAI API).
+# Reusable Claude second-opinion PR review (Anthropic Messages API).
 #
-# Call from any BDC repo with a stub like:
+# Same shape as grok-review.yml. Call from any BDC repo with a stub like:
 #
-#   name: Grok second-opinion review
+#   name: Claude second-opinion review
 #   on:
 #     pull_request:
 #       types: [opened, synchronize, reopened, ready_for_review]
@@ -10,20 +10,20 @@
 #     contents: read
 #     pull-requests: write
 #   jobs:
-#     grok:
-#       uses: BraunDesignCo/.github/.github/workflows/grok-review.yml@main
+#     claude:
+#       uses: BraunDesignCo/.github/.github/workflows/claude-review.yml@main
 #       secrets: inherit
 #       with:
 #         context: |
 #           <repo-specific review guidance, optional>
 #
-# XAI_API_KEY lives once at the BraunDesignCo org (private-repo
-# visibility). Callers use `secrets: inherit`. Without the secret the
-# job exits quietly and never fails the PR. Opt a PR out with the
-# `skip-grok` label. Do not add this caller to repos shared with
-# outside developers.
+# ANTHROPIC_API_KEY lives once at the BraunDesignCo org (private-repo
+# visibility), same as XAI_API_KEY. Callers use `secrets: inherit`.
+# Without the secret the job exits quietly and never fails the PR.
+# Opt a PR out with the `skip-claude` label. Do not add this caller to
+# repos shared with outside developers.
 
-name: Grok second-opinion review (reusable)
+name: Claude second-opinion review (reusable)
 
 on:
   workflow_call:
@@ -34,10 +34,10 @@ on:
         required: false
         default: ""
       model:
-        description: xAI model to use
+        description: Anthropic model to use
         type: string
         required: false
-        default: grok-4.3
+        default: claude-sonnet-4-6
       max_diff_bytes:
         description: Diff size cap sent to the model
         type: number
@@ -49,29 +49,29 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: grok-review-${{ github.event.pull_request.number }}
+  group: claude-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   review:
-    if: ${{ !github.event.pull_request.draft && !contains(github.event.pull_request.labels.*.name, 'skip-grok') }}
+    if: ${{ !github.event.pull_request.draft && !contains(github.event.pull_request.labels.*.name, 'skip-claude') }}
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
-      XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
-      GROK_MODEL: ${{ inputs.model }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CLAUDE_MODEL: ${{ inputs.model }}
       MAX_DIFF: ${{ inputs.max_diff_bytes }}
       REPO_CONTEXT: ${{ inputs.context }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
       PR_TITLE: ${{ github.event.pull_request.title }}
       REPO: ${{ github.repository }}
-      COMMENT_MARKER: "<!-- grok-second-opinion -->"
+      COMMENT_MARKER: "<!-- claude-second-opinion -->"
     steps:
       - name: Bail quietly if no API key
         id: keycheck
         run: |
-          if [ -z "$XAI_API_KEY" ]; then
-            echo "XAI_API_KEY secret not set; skipping Grok review." >> "$GITHUB_STEP_SUMMARY"
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "ANTHROPIC_API_KEY secret not set; skipping Claude review." >> "$GITHUB_STEP_SUMMARY"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -85,7 +85,7 @@ jobs:
             printf '\n\n[DIFF TRUNCATED — review what is shown and say the review is partial]\n' >> /tmp/diff-capped.patch
           fi
 
-      - name: Ask Grok
+      - name: Ask Claude
         if: steps.keycheck.outputs.skip != 'true'
         run: |
           cat > /tmp/system.txt <<'PROMPT'
@@ -106,23 +106,24 @@ jobs:
             --rawfile diff /tmp/diff-capped.patch \
             --rawfile body /tmp/body.md \
             --arg title "$PR_TITLE" \
-            --arg model "$GROK_MODEL" \
+            --arg model "$CLAUDE_MODEL" \
             '{model: $model, temperature: 0.2, max_tokens: 2500,
+              system: $sys,
               messages: [
-                {role: "system", content: $sys},
                 {role: "user", content: ("PR title: " + $title + "\n\nPR description:\n" + $body + "\n\nDiff:\n" + $diff)}
               ]}' > /tmp/req.json
           HTTP_CODE=$(curl -sS -o /tmp/resp.json -w '%{http_code}' \
-            https://api.x.ai/v1/chat/completions \
-            -H "Authorization: Bearer $XAI_API_KEY" \
+            https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
             -H "Content-Type: application/json" \
             --data @/tmp/req.json)
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "xAI API returned $HTTP_CODE" >> "$GITHUB_STEP_SUMMARY"
+            echo "Anthropic API returned $HTTP_CODE" >> "$GITHUB_STEP_SUMMARY"
             cat /tmp/resp.json >> "$GITHUB_STEP_SUMMARY" || true
-            echo "Grok review unavailable (API $HTTP_CODE)." > /tmp/review.md
+            echo "Claude review unavailable (API $HTTP_CODE)." > /tmp/review.md
           else
-            jq -r '.choices[0].message.content // "Grok returned an empty response."' /tmp/resp.json > /tmp/review.md
+            jq -r '.content[0].text // .error.message // "Claude returned an empty response."' /tmp/resp.json > /tmp/review.md
           fi
 
       - name: Post or update PR comment
@@ -130,12 +131,12 @@ jobs:
         run: |
           {
             echo "$COMMENT_MARKER"
-            echo "## Grok second opinion (\`$GROK_MODEL\`)"
+            echo "## Claude second opinion (\`$CLAUDE_MODEL\`)"
             echo
             cat /tmp/review.md
             echo
             echo "---"
-            echo "_Independent review — verify findings against the code before acting. Label \`skip-grok\` to opt a PR out._"
+            echo "_Independent review — verify findings against the code before acting. Label \`skip-claude\` to opt a PR out._"
           } > /tmp/comment.md
           EXISTING=$(gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
             --jq ".[] | select(.body | startswith(\"$COMMENT_MARKER\")) | .id" | head -n 1)
