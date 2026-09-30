@@ -1,7 +1,8 @@
 # RETIRED 2026-08-31.
 # Grok second-opinion PR review was removed org-wide after an audit:
 # it did not catch bugs Bugbot missed, and it defaulted to needs-changes
-# on nits. Bugbot stays. Do not re-add callers.
+# on nits. Do not re-add callers. Bugbot itself was turned off on
+# 2026-09-29; each repo's claude-code-review.yml is the PR reviewer now.
 #
 # This stub keeps workflow_call so leftover thin callers do not fail CI
 # or spend XAI_API_KEY credits. Delete leftover
