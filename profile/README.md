@@ -15,6 +15,13 @@ Founded in 2016, we work with mid-market brands, writing code that fits your the
 
 We work close to the platform: Liquid, GraphQL, custom web pixels, and Shopify Flow, integrated into your existing theme rather than bolted on top. Clean, semantically correct code is the default, not an upgrade.
 
+[![Shopify Plus](https://img.shields.io/badge/Shopify_Plus-24292F?style=flat&logo=shopify&logoColor=95BF47)](https://www.shopify.com/plus)
+[![Liquid](https://img.shields.io/badge/Liquid-24292F?style=flat&logo=shopify&logoColor=95BF47)](https://shopify.dev/docs/api/liquid)
+[![Shopify Flow](https://img.shields.io/badge/Shopify_Flow-24292F?style=flat&logo=shopify&logoColor=95BF47)](https://help.shopify.com/en/manual/shopify-flow)
+[![Web Pixels](https://img.shields.io/badge/Web_Pixels-24292F?style=flat&logo=shopify&logoColor=95BF47)](https://shopify.dev/docs/apps/build/marketing-analytics/pixels)
+[![GraphQL](https://img.shields.io/badge/GraphQL-24292F?style=flat&logo=graphql&logoColor=E10098)](https://graphql.org)
+[![JavaScript](https://img.shields.io/badge/JavaScript-24292F?style=flat&logo=javascript&logoColor=F7DF1E)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
+
 ## Brands we've worked with
 
 KT Tape, Baby Trend, EcoNugenics, Saalt, Urban Body Jewelry, Derma E, and Gossamer Gear.
